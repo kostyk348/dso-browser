@@ -222,6 +222,16 @@ void mesh_add_local_prefix(mesh_ctx *ctx, const psirp_name *prefix);
 void mesh_stats(const mesh_ctx *ctx, size_t *peers, size_t *fib_entries,
                 uint64_t *interests, uint64_t *data);
 
+/**
+ * @brief Get current time in milliseconds.
+ */
+uint64_t mesh_now_ms(void);
+
+/**
+ * @brief Format peer name as string.
+ */
+size_t mesh_peer_name_to_string(const mesh_peer *peer, char *buf, size_t buf_len);
+
 #ifdef __cplusplus
 }
 #endif

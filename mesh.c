@@ -26,7 +26,7 @@
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-static uint64_t now_ms(void) {
+uint64_t mesh_now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
@@ -35,7 +35,7 @@ static uint64_t now_ms(void) {
 /**
  * @brief Format peer name as string.
  */
-static size_t peer_name_to_string(const mesh_peer *peer, char *buf, size_t buf_len) {
+size_t mesh_peer_name_to_string(const mesh_peer *peer, char *buf, size_t buf_len) {
     if (peer->name_count == 0) {
         buf[0] = '\0';
         return 0;
@@ -94,11 +94,11 @@ int mesh_add_peer(mesh_ctx *ctx, const char *name, const struct sockaddr_in *add
     // Check if peer already exists
     for (size_t i = 0; i < ctx->peer_count; i++) {
         char existing[256];
-        peer_name_to_string(&ctx->peers[i], existing, sizeof(existing));
+        mesh_peer_name_to_string(&ctx->peers[i], existing, sizeof(existing));
         if (strcmp(existing, name) == 0) {
             // Update address and timestamp
             ctx->peers[i].addr = *addr;
-            ctx->peers[i].last_seen = now_ms();
+            ctx->peers[i].last_seen = mesh_now_ms();
             ctx->peers[i].state = MESH_PEER_CONNECTED;
             return (int)i;
         }
@@ -111,7 +111,7 @@ int mesh_add_peer(mesh_ctx *ctx, const char *name, const struct sockaddr_in *add
     peer->name_count = parse_name(name, peer->name, PSIRP_MAX_COMPONENTS);
     peer->addr = *addr;
     peer->state = MESH_PEER_DISCOVERED;
-    peer->last_seen = now_ms();
+    peer->last_seen = mesh_now_ms();
     
     return (int)ctx->peer_count++;
 }
@@ -145,7 +145,7 @@ int mesh_find_peer(const mesh_ctx *ctx, const char *name) {
     
     for (size_t i = 0; i < ctx->peer_count; i++) {
         char peer_name[256];
-        peer_name_to_string(&ctx->peers[i], peer_name, sizeof(peer_name));
+        mesh_peer_name_to_string(&ctx->peers[i], peer_name, sizeof(peer_name));
         if (strcmp(peer_name, name) == 0) {
             return (int)i;
         }
@@ -155,7 +155,7 @@ int mesh_find_peer(const mesh_ctx *ctx, const char *name) {
 
 void mesh_peer_seen(mesh_ctx *ctx, size_t peer_index) {
     if (!ctx || peer_index >= ctx->peer_count) return;
-    ctx->peers[peer_index].last_seen = now_ms();
+    ctx->peers[peer_index].last_seen = mesh_now_ms();
     ctx->peers[peer_index].state = MESH_PEER_CONNECTED;
 }
 
@@ -185,7 +185,7 @@ bool mesh_add_fib(mesh_ctx *ctx, const psirp_name *prefix, size_t peer_index,
             ctx->fib[i].peer_index == peer_index) {
             // Update lifetime
             ctx->fib[i].lifetime_ms = lifetime_ms;
-            ctx->fib[i].created_at = now_ms();
+            ctx->fib[i].created_at = mesh_now_ms();
             return true;
         }
     }
@@ -195,7 +195,7 @@ bool mesh_add_fib(mesh_ctx *ctx, const psirp_name *prefix, size_t peer_index,
     entry->prefix = *prefix;
     entry->peer_index = peer_index;
     entry->lifetime_ms = lifetime_ms;
-    entry->created_at = now_ms();
+    entry->created_at = mesh_now_ms();
     
     return true;
 }
