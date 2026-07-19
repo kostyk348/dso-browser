@@ -79,9 +79,12 @@ static void process_command(mesh_ctx *mesh, const char *cmd) {
         psirp_name name;
         psirp_name_init(&name, arg1);
         
-        printf("Fetching %s...\n", arg1);
+        printf("Fetching %s (TTL=%d)...\n", arg1, MESH_INTEREST_TTL);
         
-        const psirp_cs_entry *entry = mesh_forward_interest(mesh, &name, 4000);
+        const psirp_cs_entry *entry = mesh_forward_interest(mesh, &name,
+                                                            MESH_INTEREST_TTL,
+                                                            mesh_now_ms(),
+                                                            -1, 4000);
         if (entry) {
             printf("Received %zu bytes:\n", entry->data_len);
             // Print first 100 bytes

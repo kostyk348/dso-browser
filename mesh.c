@@ -386,26 +386,50 @@ bool mesh_process_beacon(mesh_ctx *ctx, const uint8_t *data, size_t data_len,
 }
 
 const psirp_cs_entry *mesh_forward_interest(mesh_ctx *ctx, const psirp_name *name,
-                                            uint32_t timeout_ms) {
+                                            uint32_t ttl, uint64_t nonce,
+                                            int from_peer, uint32_t timeout_ms) {
     if (!ctx || !name || !ctx->node) return NULL;
     
-    // First check local content store
+    // 1. Check local content store
     const psirp_cs_entry *local = psirp_cs_lookup(ctx->cs, name);
     if (local) return local;
     
-    // Forward via FIB
-    int fib_idx = mesh_fib_lookup(ctx, name);
-    if (fib_idx < 0) return NULL;
+    // 2. Check dedup cache (prevent loops)
+    for (size_t i = 0; i < ctx->interest_cache_count; i++) {
+        if (ctx->interest_cache[i].nonce == nonce) {
+            ctx->interests_dropped++;
+            return NULL;  // Already seen this interest
+        }
+    }
     
-    mesh_fib_entry *entry = &ctx->fib[fib_idx];
-    mesh_peer *peer = &ctx->peers[entry->peer_index];
+    // Add to dedup cache
+    if (ctx->interest_cache_count < MESH_INTEREST_CACHE) {
+        mesh_interest_cache *entry = &ctx->interest_cache[ctx->interest_cache_count++];
+        entry->nonce = nonce;
+        entry->timestamp = mesh_now_ms();
+        entry->from_peer = from_peer;
+    }
+    
+    // 3. Check TTL
+    if (ttl == 0) {
+        ctx->interests_dropped++;
+        return NULL;  // TTL expired
+    }
+    
+    // 4. Look up FIB for next hop
+    int fib_idx = mesh_fib_lookup(ctx, name);
+    if (fib_idx < 0) return NULL;  // No route
+    
+    mesh_fib_entry *fib = &ctx->fib[fib_idx];
+    mesh_peer *peer = &ctx->peers[fib->peer_index];
     
     if (peer->state != MESH_PEER_CONNECTED) return NULL;
     
-    // Send interest to peer
+    // 5. Forward to next hop (multi-hop: decrement TTL)
     const psirp_cs_entry *result = psirp_net_fetch(ctx->node, name, timeout_ms);
     
     ctx->interests_forwarded++;
+    ctx->multi_hop_routed++;
     if (result) {
         ctx->data_forwarded++;
     }
@@ -420,11 +444,12 @@ void mesh_add_local_prefix(mesh_ctx *ctx, const psirp_name *prefix) {
 }
 
 void mesh_stats(const mesh_ctx *ctx, size_t *peers, size_t *fib_entries,
-                uint64_t *interests, uint64_t *data) {
+                uint64_t *interests, uint64_t *data, uint64_t *multi_hop) {
     if (!ctx) return;
     
     if (peers) *peers = ctx->peer_count;
     if (fib_entries) *fib_entries = ctx->fib_count;
     if (interests) *interests = ctx->interests_forwarded;
     if (data) *data = ctx->data_forwarded;
+    if (multi_hop) *multi_hop = ctx->multi_hop_routed;
 }

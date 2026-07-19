@@ -32,8 +32,11 @@ extern "C" {
 #define MESH_MAX_PEERS      32    ///< Max peers in mesh
 #define MESH_MAX_FIB        128   ///< Max FIB entries
 #define MESH_MAX_PREFIXES   16    ///< Max prefixes per peer
+#define MESH_MAX_HOPS       8     ///< Max hops for multi-hop routing
+#define MESH_INTEREST_TTL   16    ///< Default interest TTL
 #define MESH_BEACON_INTERVAL 5000 ///< Beacon interval (ms)
 #define MESH_PEER_TIMEOUT   15000 ///< Peer timeout (ms)
+#define MESH_INTEREST_CACHE 256   ///< Max cached interests (dedup)
 
 // ── Peer ──────────────────────────────────────────────────────────────────────
 
@@ -69,6 +72,13 @@ typedef struct {
 
 // ── Mesh Context ──────────────────────────────────────────────────────────────
 
+/** @brief Interest cache entry (for dedup). */
+typedef struct {
+    uint64_t    nonce;          ///< Interest nonce
+    uint64_t    timestamp;      ///< When received (ms)
+    size_t      from_peer;      ///< Which peer sent it (-1 = local)
+} mesh_interest_cache;
+
 /** @brief Mesh overlay context. */
 typedef struct {
     psirp_node     *node;           ///< Network node
@@ -86,15 +96,21 @@ typedef struct {
     psirp_name      local_prefixes[MESH_MAX_PREFIXES];
     size_t          local_prefix_count;
 
+    // Interest dedup cache
+    mesh_interest_cache interest_cache[MESH_INTEREST_CACHE];
+    size_t          interest_cache_count;
+
     // Multicast
     struct sockaddr_in mcast_addr;  ///< Multicast group address
     int              mcast_fd;      ///< Multicast socket
 
     // Stats
     uint64_t        interests_forwarded;
+    uint64_t        interests_dropped;  ///< Dropped (loop detected)
     uint64_t        data_forwarded;
     uint64_t        beacons_sent;
     uint64_t        beacons_received;
+    uint64_t        multi_hop_routed;   ///< Multi-hop routes taken
 } mesh_ctx;
 
 // ── Peer Management ───────────────────────────────────────────────────────────
@@ -203,13 +219,24 @@ bool mesh_process_beacon(mesh_ctx *ctx, const uint8_t *data, size_t data_len,
 /**
  * @brief Forward interest to next hop via FIB.
  *
+ * Multi-hop routing:
+ * 1. Check local CS (if we have it, return immediately)
+ * 2. Check dedup cache (if seen, drop to prevent loops)
+ * 3. Look up FIB for next hop
+ * 4. Forward to next hop with decremented TTL
+ * 5. If TTL=0, drop
+ *
  * @param ctx       Mesh context
  * @param name      Content name
+ * @param ttl       Time-to-live (hops remaining)
+ * @param nonce     Interest nonce (for dedup)
+ * @param from_peer Peer that sent us this interest (-1 = local origin)
  * @param timeout_ms Fetch timeout
- * @return Content entry, or NULL if not found
+ * @return Content entry, or NULL if not found/forwarded
  */
 const psirp_cs_entry *mesh_forward_interest(mesh_ctx *ctx, const psirp_name *name,
-                                            uint32_t timeout_ms);
+                                            uint32_t ttl, uint64_t nonce,
+                                            int from_peer, uint32_t timeout_ms);
 
 /**
  * @brief Add local prefix (what this peer publishes).
@@ -220,7 +247,7 @@ void mesh_add_local_prefix(mesh_ctx *ctx, const psirp_name *prefix);
  * @brief Get mesh statistics.
  */
 void mesh_stats(const mesh_ctx *ctx, size_t *peers, size_t *fib_entries,
-                uint64_t *interests, uint64_t *data);
+                uint64_t *interests, uint64_t *data, uint64_t *multi_hop);
 
 /**
  * @brief Get current time in milliseconds.

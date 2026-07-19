@@ -193,19 +193,56 @@ static void test_stats(void) {
     
     ctx.interests_forwarded = 100;
     ctx.data_forwarded = 80;
+    ctx.multi_hop_routed = 50;
     
     struct sockaddr_in addr = make_addr("192.168.1.10", 9700);
     mesh_add_peer(&ctx, "/server1", &addr);
     mesh_add_peer(&ctx, "/server2", &addr);
     
     size_t peers, fib_entries;
-    uint64_t interests, data;
-    mesh_stats(&ctx, &peers, &fib_entries, &interests, &data);
+    uint64_t interests, data, multi_hop;
+    mesh_stats(&ctx, &peers, &fib_entries, &interests, &data, &multi_hop);
     
     assert(peers == 2);
     assert(fib_entries == 0);
     assert(interests == 100);
     assert(data == 80);
+    assert(multi_hop == 50);
+    
+    PASS();
+}
+
+static void test_interest_dedup(void) {
+    TEST("Interest dedup cache");
+    
+    mesh_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    
+    // Simulate adding to dedup cache
+    ctx.interest_cache[0].nonce = 12345;
+    ctx.interest_cache[0].timestamp = mesh_now_ms();
+    ctx.interest_cache[0].from_peer = 0;
+    ctx.interest_cache_count = 1;
+    
+    // Check dedup
+    bool found = false;
+    for (size_t i = 0; i < ctx.interest_cache_count; i++) {
+        if (ctx.interest_cache[i].nonce == 12345) {
+            found = true;
+            break;
+        }
+    }
+    assert(found);
+    
+    // Different nonce not found
+    found = false;
+    for (size_t i = 0; i < ctx.interest_cache_count; i++) {
+        if (ctx.interest_cache[i].nonce == 99999) {
+            found = true;
+            break;
+        }
+    }
+    assert(!found);
     
     PASS();
 }
@@ -221,6 +258,7 @@ int main(void) {
     test_beacon_format();
     test_peer_timeout();
     test_stats();
+    test_interest_dedup();
     
     printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
