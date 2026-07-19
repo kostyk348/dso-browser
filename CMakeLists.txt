@@ -108,6 +108,9 @@ target_link_libraries(test_signing PRIVATE psirp Threads::Threads)
 add_executable(mesh_demo mesh_demo.c)
 target_link_libraries(mesh_demo PRIVATE psirp Threads::Threads)
 
+add_executable(terminal_browser terminal_browser.c)
+target_link_libraries(terminal_browser PRIVATE psirp Threads::Threads)
+
 # ── Install ────────────────────────────────────────────────────────────────────
 
 install(TARGETS dso-browser publisher client
