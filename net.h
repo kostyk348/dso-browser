@@ -34,13 +34,15 @@ extern "C" {
 
 // ── Network Node ──────────────────────────────────────────────────────────────
 
-/** @brief Pending interest — tracks outstanding request. */
+/** @brief Pending interest — tracks outstanding request.
+ *  `active` is written by the receiver thread and read by the caller's
+ *  wait loop, so it must be `volatile` to survive -O3 reordering. */
 typedef struct {
     psirp_name  name;           ///< What we requested
     uint64_t    nonce;          ///< Request nonce
     uint64_t    sent_time_ns;   ///< When we sent it
     uint32_t    lifetime_ms;    ///< Timeout
-    bool        active;         ///< Still waiting?
+    volatile bool active;       ///< Still waiting? (cross-thread)
 } psirp_pending;
 
 /** @brief Network node — UDP socket + content store + FIB. */
@@ -50,28 +52,28 @@ typedef struct {
     uint16_t        port;           ///< Our port
     psirp_cs       *cs;             ///< Content store (external)
     psirp_fib       fib;            ///< Forwarding table
-    
+
     // Pending interests
     psirp_pending   pending[256];   ///< Outstanding interests
-    size_t          pending_count;  ///< Active pending count
-    
+    volatile size_t pending_count;  ///< Active pending count (cross-thread)
+
     // Known peers
     psirp_peer      peers[PSIRP_MAX_PEERS];
-    size_t          peer_count;
-    
+    volatile size_t peer_count;     ///< Cross-thread (beacon discovery)
+
     // Threading
     pthread_t       recv_thread;    ///< Receiver thread
-    bool            running;        ///< Thread control
-    
+    volatile bool   running;        ///< Thread control (cross-thread)
+
     // Callbacks
     void (*on_data)(const psirp_data *data, void *user);
     void *on_data_user;
-    
+
     // Statistics
-    uint64_t        interests_sent;
-    uint64_t        data_received;
-    uint64_t        data_sent;
-    uint64_t        interests_forwarded;
+    volatile uint64_t interests_sent;
+    volatile uint64_t data_received;
+    volatile uint64_t data_sent;
+    volatile uint64_t interests_forwarded;
 } psirp_node;
 
 /**

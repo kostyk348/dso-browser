@@ -159,25 +159,43 @@ static void test_network_exchange(void) {
     psirp_cs cs_a;
     psirp_cs_init(&cs_a, cs_a_mem, sizeof(cs_a_mem));
     psirp_node node_a;
-    assert(psirp_net_init(&node_a, 9700, &cs_a));
-    
+    memset(&node_a, 0, sizeof(node_a));
+    if (!psirp_net_init(&node_a, 9750, &cs_a)) {
+        FAIL("publisher net_init failed");
+        return;
+    }
+
     psirp_name pub_name;
     psirp_name_init(&pub_name, "/server/data");
     const char *payload = "PSIRP CONTENT";
     psirp_cs_store(&cs_a, &pub_name, (const uint8_t *)payload, strlen(payload), 0);
-    
-    assert(psirp_net_start(&node_a));
-    
+
+    if (!psirp_net_start(&node_a)) {
+        FAIL("publisher net_start failed");
+        psirp_net_stop(&node_a);
+        return;
+    }
+
     // Client node
     uint8_t cs_b_mem[64 * 1024];
     psirp_cs cs_b;
     psirp_cs_init(&cs_b, cs_b_mem, sizeof(cs_b_mem));
     psirp_node node_b;
-    assert(psirp_net_init(&node_b, 0, &cs_b));
-    psirp_net_add_peer(&node_b, inet_addr("127.0.0.1"), 9700);
-    assert(psirp_net_start(&node_b));
-    
-    usleep(200000); // Let threads start
+    memset(&node_b, 0, sizeof(node_b));
+    if (!psirp_net_init(&node_b, 0, &cs_b)) {
+        FAIL("client net_init failed");
+        psirp_net_stop(&node_a);
+        return;
+    }
+    psirp_net_add_peer(&node_b, inet_addr("127.0.0.1"), 9750);
+    if (!psirp_net_start(&node_b)) {
+        FAIL("client net_start failed");
+        psirp_net_stop(&node_a);
+        psirp_net_stop(&node_b);
+        return;
+    }
+
+    sleep(1); // Let threads start
     
     // Fetch
     psirp_name req;
@@ -188,7 +206,13 @@ static void test_network_exchange(void) {
         memcmp(entry->data, payload, strlen(payload)) == 0) {
         PASS();
     } else {
-        FAIL("content mismatch or not found");
+        if (!entry) {
+            FAIL("content not found (entry is NULL)");
+        } else {
+            printf("  Expected: %s (len=%zu)\n", payload, strlen(payload));
+            printf("  Got: %.*s (len=%zu)\n", (int)entry->data_len, entry->data, entry->data_len);
+            FAIL("content mismatch");
+        }
     }
     
     psirp_net_stop(&node_b);
