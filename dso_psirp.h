@@ -16,6 +16,7 @@
 #include "dso.h"
 #include "psirp.h"
 #include "net.h"
+#include "html_parse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,6 +64,9 @@ typedef struct {
     // Content items
     dso_psirp_content items[64];        ///< Fetched content
     size_t          item_count;
+    
+    // HTML parsing
+    html_parse_result html_result;      ///< Parsed HTML sub-resources
     
     // Current page
     psirp_name      page_name;          ///< Current page name
@@ -160,6 +164,15 @@ void dso_psirp_task_resolve_css(void *user);
  * @param user  dso_psirp_ctx*
  */
 void dso_psirp_task_resolve_images(void *user);
+
+/**
+ * @brief DSO task: Fetch script sub-resources.
+ *
+ * Contract: WCET 5ms (parsing + fetching)
+ *
+ * @param user  dso_psirp_ctx*
+ */
+void dso_psirp_task_resolve_scripts(void *user);
 
 /**
  * @brief DSO task: Render page to bitmap.

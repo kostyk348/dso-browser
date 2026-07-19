@@ -132,7 +132,12 @@ void dso_psirp_task_parse(void *user) {
     if (!ctx || !ctx->page_html) return;
 
     uint64_t start = now_ns();
-    // TODO: proper HTML parsing for sub-resource references
+
+    // Parse HTML for sub-resource references
+    html_parse((const char *)ctx->page_html->data, ctx->page_html->data_len,
+               ctx->page_name.count > 0 ? ctx->page_name.components[0] : "/",
+               &ctx->html_result);
+
     ctx->parse_time_ns += now_ns() - start;
 }
 
@@ -141,7 +146,39 @@ void dso_psirp_task_resolve_css(void *user) {
     if (!ctx || !ctx->net) return;
 
     uint64_t start = now_ns();
-    // TODO: parse CSS refs from HTML, fetch each
+
+    // Fetch CSS sub-resources from parsed HTML
+    for (size_t i = 0; i < ctx->html_result.resource_count && ctx->item_count < 64; i++) {
+        html_resource *res = &ctx->html_result.resources[i];
+        if (res->type != HTML_RES_STYLESHEET) continue;
+
+        psirp_name css_name;
+        psirp_name_init(&css_name, res->name);
+
+        const psirp_cs_entry *entry = psirp_net_fetch(ctx->net, &css_name,
+                                                       DSO_PSIRP_FETCH_TIMEOUT);
+        if (entry) {
+            dso_psirp_content *item = &ctx->items[ctx->item_count++];
+            psirp_name_init_components(&item->name, entry->name.components, entry->name.count);
+            item->type = DSO_PSIRP_CONTENT_CSS;
+            item->data = entry->data;
+            item->data_len = entry->data_len;
+            item->resolved = true;
+        }
+    }
+
+    // Fetch inline CSS
+    for (size_t i = 0; i < ctx->html_result.resource_count && ctx->item_count < 64; i++) {
+        html_resource *res = &ctx->html_result.resources[i];
+        if (res->type != HTML_RES_INLINE_CSS) continue;
+
+        dso_psirp_content *item = &ctx->items[ctx->item_count++];
+        item->type = DSO_PSIRP_CONTENT_CSS;
+        item->data = (const uint8_t *)res->inline_data;
+        item->data_len = res->inline_len;
+        item->resolved = true;
+    }
+
     ctx->parse_time_ns += now_ns() - start;
 }
 
@@ -150,7 +187,56 @@ void dso_psirp_task_resolve_images(void *user) {
     if (!ctx || !ctx->net) return;
 
     uint64_t start = now_ns();
-    // TODO: parse image refs from HTML, fetch each
+
+    // Fetch image sub-resources from parsed HTML
+    for (size_t i = 0; i < ctx->html_result.resource_count && ctx->item_count < 64; i++) {
+        html_resource *res = &ctx->html_result.resources[i];
+        if (res->type != HTML_RES_IMAGE) continue;
+
+        psirp_name img_name;
+        psirp_name_init(&img_name, res->name);
+
+        const psirp_cs_entry *entry = psirp_net_fetch(ctx->net, &img_name,
+                                                       DSO_PSIRP_FETCH_TIMEOUT);
+        if (entry) {
+            dso_psirp_content *item = &ctx->items[ctx->item_count++];
+            psirp_name_init_components(&item->name, entry->name.components, entry->name.count);
+            item->type = DSO_PSIRP_CONTENT_IMAGE;
+            item->data = entry->data;
+            item->data_len = entry->data_len;
+            item->resolved = true;
+        }
+    }
+
+    ctx->parse_time_ns += now_ns() - start;
+}
+
+void dso_psirp_task_resolve_scripts(void *user) {
+    dso_psirp_ctx *ctx = (dso_psirp_ctx *)user;
+    if (!ctx || !ctx->net) return;
+
+    uint64_t start = now_ns();
+
+    // Fetch script sub-resources from parsed HTML
+    for (size_t i = 0; i < ctx->html_result.resource_count && ctx->item_count < 64; i++) {
+        html_resource *res = &ctx->html_result.resources[i];
+        if (res->type != HTML_RES_SCRIPT) continue;
+
+        psirp_name js_name;
+        psirp_name_init(&js_name, res->name);
+
+        const psirp_cs_entry *entry = psirp_net_fetch(ctx->net, &js_name,
+                                                       DSO_PSIRP_FETCH_TIMEOUT);
+        if (entry) {
+            dso_psirp_content *item = &ctx->items[ctx->item_count++];
+            psirp_name_init_components(&item->name, entry->name.components, entry->name.count);
+            item->type = DSO_PSIRP_CONTENT_JS;
+            item->data = entry->data;
+            item->data_len = entry->data_len;
+            item->resolved = true;
+        }
+    }
+
     ctx->parse_time_ns += now_ns() - start;
 }
 
@@ -180,20 +266,23 @@ bool dso_psirp_build_graph(dso_psirp_ctx *ctx, const psirp_name *page_name) {
     dso_context_init(dso, ctx->arena);
 
     // Register tasks — dso_task returns ID via out_id
-    uint32_t id_fetch, id_parse, id_css, id_images, id_render;
+    uint32_t id_fetch, id_parse, id_css, id_images, id_scripts, id_render;
 
-    dso_task(dso, "fetch_html",   dso_psirp_task_fetch,        ctx, &id_fetch);
-    dso_task(dso, "parse_html",   dso_psirp_task_parse,        ctx, &id_parse);
-    dso_task(dso, "fetch_css",    dso_psirp_task_resolve_css,  ctx, &id_css);
-    dso_task(dso, "fetch_images", dso_psirp_task_resolve_images, ctx, &id_images);
-    dso_task(dso, "render",       dso_psirp_task_render,       ctx, &id_render);
+    dso_task(dso, "fetch_html",    dso_psirp_task_fetch,          ctx, &id_fetch);
+    dso_task(dso, "parse_html",    dso_psirp_task_parse,          ctx, &id_parse);
+    dso_task(dso, "fetch_css",     dso_psirp_task_resolve_css,    ctx, &id_css);
+    dso_task(dso, "fetch_images",  dso_psirp_task_resolve_images, ctx, &id_images);
+    dso_task(dso, "fetch_scripts", dso_psirp_task_resolve_scripts, ctx, &id_scripts);
+    dso_task(dso, "render",        dso_psirp_task_render,         ctx, &id_render);
 
     // Dependencies (by ID)
-    dso_dep(dso, id_fetch,  id_parse);    // parse waits for fetch
-    dso_dep(dso, id_parse,  id_css);      // fetch_css waits for parse
-    dso_dep(dso, id_parse,  id_images);   // fetch_images waits for parse
-    dso_dep(dso, id_css,    id_render);   // render waits for css
-    dso_dep(dso, id_images, id_render);   // render waits for images
+    dso_dep(dso, id_fetch,   id_parse);    // parse waits for fetch
+    dso_dep(dso, id_parse,   id_css);      // fetch_css waits for parse
+    dso_dep(dso, id_parse,   id_images);   // fetch_images waits for parse
+    dso_dep(dso, id_parse,   id_scripts);  // fetch_scripts waits for parse
+    dso_dep(dso, id_css,     id_render);   // render waits for css
+    dso_dep(dso, id_images,  id_render);   // render waits for images
+    dso_dep(dso, id_scripts, id_render);   // render waits for scripts
 
     // Compile with global frame contract (16ms budget = 60fps)
     dso_contract frame_contract = {
