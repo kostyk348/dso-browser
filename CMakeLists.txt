@@ -31,6 +31,7 @@ add_library(psirp STATIC
     net.c
     dso_psirp.c
     html_parse.c
+    mesh.c
 )
 
 target_include_directories(psirp PUBLIC
@@ -96,6 +97,9 @@ target_link_libraries(test_psirp PRIVATE psirp Threads::Threads)
 
 add_executable(test_html_parse test_html_parse.c)
 target_link_libraries(test_html_parse PRIVATE psirp Threads::Threads)
+
+add_executable(test_mesh test_mesh.c)
+target_link_libraries(test_mesh PRIVATE psirp Threads::Threads)
 
 # ── Install ────────────────────────────────────────────────────────────────────
 
