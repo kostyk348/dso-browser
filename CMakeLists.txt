@@ -32,6 +32,7 @@ add_library(psirp STATIC
     dso_psirp.c
     html_parse.c
     mesh.c
+    signing.c
 )
 
 target_include_directories(psirp PUBLIC
@@ -100,6 +101,9 @@ target_link_libraries(test_html_parse PRIVATE psirp Threads::Threads)
 
 add_executable(test_mesh test_mesh.c)
 target_link_libraries(test_mesh PRIVATE psirp Threads::Threads)
+
+add_executable(test_signing test_signing.c)
+target_link_libraries(test_signing PRIVATE psirp Threads::Threads)
 
 add_executable(mesh_demo mesh_demo.c)
 target_link_libraries(mesh_demo PRIVATE psirp Threads::Threads)
