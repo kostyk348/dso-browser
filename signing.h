@@ -29,7 +29,7 @@ extern "C" {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 #define PSIRP_KEY_SIZE      32    ///< Ed25519 public key size
-#define PSIRP_SECRET_SIZE   32    ///< Ed25519 secret key size
+#define PSIRP_SECRET_SIZE   64    ///< Ed25519 secret key size (libsodium expanded form)
 #define PSIRP_SIGN_SIZE     64    ///< Ed25519 signature size
 #define PSIRP_SEED_SIZE     32    ///< Seed size for key generation
 

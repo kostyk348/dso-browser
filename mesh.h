@@ -19,6 +19,7 @@
 
 #include "psirp.h"
 #include "net.h"
+#include "dht.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <netinet/in.h>
@@ -103,6 +104,10 @@ typedef struct {
     // Multicast
     struct sockaddr_in mcast_addr;  ///< Multicast group address
     int              mcast_fd;      ///< Multicast socket
+
+    // DHT (optional) — content-holder discovery
+    struct dht_node *dht;           ///< Kademlia DHT node, or NULL if unused
+    struct sockaddr_in self_addr;   ///< Our reachable address (for DHT announce)
 
     // Stats
     uint64_t        interests_forwarded;
@@ -242,6 +247,24 @@ const psirp_cs_entry *mesh_forward_interest(mesh_ctx *ctx, const psirp_name *nam
  * @brief Add local prefix (what this peer publishes).
  */
 void mesh_add_local_prefix(mesh_ctx *ctx, const psirp_name *prefix);
+
+/**
+ * @brief Attach a DHT node for content-holder discovery.
+ *
+ * When set, mesh_forward_interest consults the DHT if the FIB has no route,
+ * sending the Interest directly to the closest known holders of the content
+ * hash (instead of dropping with "no route").
+ */
+void mesh_set_dht(mesh_ctx *ctx, struct dht_node *dht);
+
+/**
+ * @brief Set our reachable address, used when announcing holdings to the DHT.
+ *
+ * @param ctx   Mesh context
+ * @param ip    Our IPv4 (host order)
+ * @param port  Our UDP port (host order)
+ */
+void mesh_set_self_addr(mesh_ctx *ctx, uint32_t ip, uint16_t port);
 
 /**
  * @brief Get mesh statistics.

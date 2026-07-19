@@ -84,6 +84,18 @@ else
 fi
 echo ""
 
+# Test 4b: DHT
+echo "--- Test 4b: DHT + Ed25519 ---"
+OUTPUT=$($BUILD_DIR/test_dht 2>&1)
+if echo "$OUTPUT" | grep -q "10 passed"; then
+    echo "[PASS] DHT + Ed25519 tests (10/10)"
+    PASS=$((PASS+1))
+else
+    echo "[FAIL] DHT + Ed25519 tests"
+    FAIL=$((FAIL+1))
+fi
+echo ""
+
 # Test 5: Signing
 echo "--- Test 5: Signing ---"
 OUTPUT=$($BUILD_DIR/test_signing 2>&1)
@@ -180,10 +192,10 @@ echo ""
 
 # Summary
 echo "=== Integration Test Results ==="
-echo "Passed: $PASS / 10"
-echo "Failed: $FAIL / 10"
+echo "Passed: $PASS / 11"
+echo "Failed: $FAIL / 11"
 echo ""
-echo "Unit tests: PSIRP(10) + HTML(9) + Mesh(7) + Signing(5) = 31 total"
+echo "Unit tests: PSIRP(10) + HTML(9) + Mesh(7) + Signing(5) + DHT(10) = 41 total"
 echo ""
 
 if [ $FAIL -eq 0 ]; then

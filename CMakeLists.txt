@@ -14,6 +14,9 @@ find_package(Threads REQUIRED)
 pkg_check_modules(WEBKIT REQUIRED webkitgtk-6.0)
 pkg_check_modules(GTK4 REQUIRED gtk4)
 
+# libsodium (Ed25519 signing)
+pkg_check_modules(SODIUM REQUIRED libsodium)
+
 # ── DSO Runtime (external) ──────────────────────────────────────────────────────
 
 set(DSO_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../dso-runtime")
@@ -33,6 +36,7 @@ add_library(psirp STATIC
     html_parse.c
     mesh.c
     signing.c
+    dht.c
 )
 
 target_include_directories(psirp PUBLIC
@@ -44,7 +48,11 @@ target_link_libraries(psirp PUBLIC
     dso_runtime
     Threads::Threads
     ${WEBKIT_LIBRARIES}
+    ${SODIUM_LIBRARIES}
 )
+
+target_include_directories(psirp PUBLIC ${SODIUM_INCLUDE_DIRS})
+target_compile_options(psirp PUBLIC ${SODIUM_CFLAGS_OTHER})
 
 # ── DSO Browser ────────────────────────────────────────────────────────────────
 
@@ -104,6 +112,9 @@ target_link_libraries(test_mesh PRIVATE psirp Threads::Threads)
 
 add_executable(test_signing test_signing.c)
 target_link_libraries(test_signing PRIVATE psirp Threads::Threads)
+
+add_executable(test_dht test_dht.c)
+target_link_libraries(test_dht PRIVATE psirp Threads::Threads)
 
 add_executable(mesh_demo mesh_demo.c)
 target_link_libraries(mesh_demo PRIVATE psirp Threads::Threads)

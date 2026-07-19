@@ -15,6 +15,7 @@
  */
 
 #include "mesh.h"
+#include "dht.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -259,6 +260,18 @@ void mesh_init(mesh_ctx *ctx, psirp_node *node, psirp_cs *cs, const char *local_
     inet_pton(AF_INET, "239.255.0.1", &ctx->mcast_addr.sin_addr);
 }
 
+void mesh_set_dht(mesh_ctx *ctx, dht_node *dht) {
+    if (!ctx) return;
+    ctx->dht = dht;
+}
+
+void mesh_set_self_addr(mesh_ctx *ctx, uint32_t ip, uint16_t port) {
+    if (!ctx) return;
+    ctx->self_addr.sin_family = AF_INET;
+    ctx->self_addr.sin_addr.s_addr = htonl(ip);
+    ctx->self_addr.sin_port = htons(port);
+}
+
 bool mesh_send_beacon(mesh_ctx *ctx) {
     if (!ctx || !ctx->node) return false;
     
@@ -392,7 +405,13 @@ const psirp_cs_entry *mesh_forward_interest(mesh_ctx *ctx, const psirp_name *nam
     
     // 1. Check local content store
     const psirp_cs_entry *local = psirp_cs_lookup(ctx->cs, name);
-    if (local) return local;
+    if (local) {
+        // We hold this content — tell the DHT so others can find us.
+        if (ctx->dht && ctx->self_addr.sin_port != 0)
+            dht_announce(ctx->dht, name->hash,
+                         ctx->self_addr.sin_addr.s_addr, ctx->self_addr.sin_port);
+        return local;
+    }
     
     // 2. Check dedup cache (prevent loops)
     for (size_t i = 0; i < ctx->interest_cache_count; i++) {
@@ -418,22 +437,43 @@ const psirp_cs_entry *mesh_forward_interest(mesh_ctx *ctx, const psirp_name *nam
     
     // 4. Look up FIB for next hop
     int fib_idx = mesh_fib_lookup(ctx, name);
+
+    // 4b. If FIB misses, consult the DHT for content holders.
+    if (fib_idx < 0 && ctx->dht) {
+        uint32_t holder_ip[DHT_MAX_HOLDERS];
+        uint16_t holder_port[DHT_MAX_HOLDERS];
+        size_t n = dht_lookup(ctx->dht, name->hash, holder_ip, holder_port);
+        for (size_t i = 0; i < n; i++) {
+            psirp_peer dht_peer = { .ip = holder_ip[i], .port = holder_port[i] };
+            psirp_net_interest(ctx->node, name, &dht_peer, timeout_ms);
+            ctx->interests_forwarded++;
+        }
+        if (n > 0) {
+            // Wait for the data to arrive in our CS via the receiver thread.
+            const psirp_cs_entry *result = psirp_net_fetch(ctx->node, name, timeout_ms);
+            ctx->multi_hop_routed++;
+            if (result) ctx->data_forwarded++;
+            return result;
+        }
+        return NULL;  // DHT had no holders either
+    }
+
     if (fib_idx < 0) return NULL;  // No route
-    
+
     mesh_fib_entry *fib = &ctx->fib[fib_idx];
     mesh_peer *peer = &ctx->peers[fib->peer_index];
-    
+
     if (peer->state != MESH_PEER_CONNECTED) return NULL;
-    
+
     // 5. Forward to next hop (multi-hop: decrement TTL)
     const psirp_cs_entry *result = psirp_net_fetch(ctx->node, name, timeout_ms);
-    
+
     ctx->interests_forwarded++;
     ctx->multi_hop_routed++;
     if (result) {
         ctx->data_forwarded++;
     }
-    
+
     return result;
 }
 
