@@ -15,6 +15,11 @@ static int tests_failed = 0;
 #define PASS() do { printf("[OK]\n"); tests_passed++; } while(0)
 #define FAIL(msg) do { printf("[FAIL] %s\n", msg); tests_failed++; } while(0)
 
+/* CHECK always evaluates expr (unlike assert under -DNDEBUG) and fails gracefully. */
+#define CHECK(expr) do { \
+    if (!(expr)) { FAIL("check failed: " #expr); return; } \
+} while (0)
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 static void test_keygen(void) {
@@ -28,10 +33,10 @@ static void test_keygen(void) {
     for (int i = 0; i < PSIRP_KEY_SIZE; i++) {
         if (kp.public_key[i] != 0) nonzero = 1;
     }
-    assert(nonzero);
+    CHECK(nonzero);
     
     // Public and secret should be different
-    assert(memcmp(kp.public_key, kp.secret_key, PSIRP_KEY_SIZE) != 0);
+    CHECK(memcmp(kp.public_key, kp.secret_key, PSIRP_KEY_SIZE) != 0);
     
     PASS();
 }
@@ -49,11 +54,11 @@ static void test_sign_verify(void) {
     psirp_sign(kp.secret_key, content, content_len, signature);
     
     // Verify (MAC scheme: signature is non-zero = valid)
-    assert(psirp_verify(kp.public_key, content, content_len, signature));
+    CHECK(psirp_verify(kp.public_key, content, content_len, signature));
     
     // Empty signature should fail
     uint8_t empty_sig[PSIRP_SIGN_SIZE] = {0};
-    assert(!psirp_verify(kp.public_key, content, content_len, empty_sig));
+    CHECK(!psirp_verify(kp.public_key, content, content_len, empty_sig));
     
     PASS();
 }
@@ -70,16 +75,16 @@ static void test_signed_content(void) {
     uint8_t signed_data[1024];
     size_t signed_len;
     
-    assert(psirp_sign_content(&kp, content, content_len, signed_data, &signed_len));
-    assert(signed_len == sizeof(psirp_signed_header) + content_len);
+    CHECK(psirp_sign_content(&kp, content, content_len, signed_data, &signed_len));
+    CHECK(signed_len == sizeof(psirp_signed_header) + content_len);
     
     // Verify signed content
     size_t verified_len;
     const uint8_t *verified_content = psirp_verify_content(signed_data, signed_len, &verified_len);
     
-    assert(verified_content != NULL);
-    assert(verified_len == content_len);
-    assert(memcmp(verified_content, content, content_len) == 0);
+    CHECK(verified_content != NULL);
+    CHECK(verified_len == content_len);
+    CHECK(memcmp(verified_content, content, content_len) == 0);
     
     PASS();
 }
@@ -105,7 +110,7 @@ static void test_tamper_detection(void) {
     const uint8_t *verified_content = psirp_verify_content(signed_data, signed_len, &verified_len);
     
     // With tampered header, content_len doesn't match
-    assert(verified_content == NULL || verified_len != content_len);
+    CHECK(verified_content == NULL || verified_len != content_len);
     
     PASS();
 }
@@ -121,8 +126,8 @@ static void test_deterministic_signing(void) {
     psirp_sign_keygen(seed, &kp2);
     
     // Same seed should produce same keys
-    assert(memcmp(kp1.public_key, kp2.public_key, PSIRP_KEY_SIZE) == 0);
-    assert(memcmp(kp1.secret_key, kp2.secret_key, PSIRP_SECRET_SIZE) == 0);
+    CHECK(memcmp(kp1.public_key, kp2.public_key, PSIRP_KEY_SIZE) == 0);
+    CHECK(memcmp(kp1.secret_key, kp2.secret_key, PSIRP_SECRET_SIZE) == 0);
     
     // Same key should produce same signature
     const uint8_t content[] = "Deterministic test";
@@ -132,7 +137,7 @@ static void test_deterministic_signing(void) {
     psirp_sign(kp1.secret_key, content, content_len, sig1);
     psirp_sign(kp2.secret_key, content, content_len, sig2);
     
-    assert(memcmp(sig1, sig2, PSIRP_SIGN_SIZE) == 0);
+    CHECK(memcmp(sig1, sig2, PSIRP_SIGN_SIZE) == 0);
     
     PASS();
 }

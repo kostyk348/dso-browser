@@ -16,6 +16,11 @@ static int tests_failed = 0;
 #define PASS() do { printf("[OK]\n"); tests_passed++; } while(0)
 #define FAIL(msg) do { printf("[FAIL] %s\n", msg); tests_failed++; } while(0)
 
+/* CHECK always evaluates expr (unlike assert under -DNDEBUG) and fails gracefully. */
+#define CHECK(expr) do { \
+    if (!(expr)) { FAIL("check failed: " #expr); return; } \
+} while (0)
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 static psirp_name make_name(const char *str) {
@@ -49,26 +54,26 @@ static void test_peer_management(void) {
     int idx1 = mesh_add_peer(&ctx, "/server1", &addr1);
     int idx2 = mesh_add_peer(&ctx, "/server2", &addr2);
     
-    assert(idx1 == 0);
-    assert(idx2 == 1);
-    assert(ctx.peer_count == 2);
+    CHECK(idx1 == 0);
+    CHECK(idx2 == 1);
+    CHECK(ctx.peer_count == 2);
     
     // Find peers
-    assert(mesh_find_peer(&ctx, "/server1") == 0);
-    assert(mesh_find_peer(&ctx, "/server2") == 1);
-    assert(mesh_find_peer(&ctx, "/unknown") == -1);
+    CHECK(mesh_find_peer(&ctx, "/server1") == 0);
+    CHECK(mesh_find_peer(&ctx, "/server2") == 1);
+    CHECK(mesh_find_peer(&ctx, "/unknown") == -1);
     
     // Update existing peer
     struct sockaddr_in addr1_new = make_addr("192.168.1.20", 9700);
     int idx1_again = mesh_add_peer(&ctx, "/server1", &addr1_new);
-    assert(idx1_again == 0);  // Same index, updated
-    assert(ctx.peer_count == 2);  // No new peer
+    CHECK(idx1_again == 0);  // Same index, updated
+    CHECK(ctx.peer_count == 2);  // No new peer
     
     // Remove peer
     mesh_remove_peer(&ctx, 0);
-    assert(ctx.peer_count == 1);
-    assert(mesh_find_peer(&ctx, "/server1") == -1);
-    assert(mesh_find_peer(&ctx, "/server2") == 0);
+    CHECK(ctx.peer_count == 1);
+    CHECK(mesh_find_peer(&ctx, "/server1") == -1);
+    CHECK(mesh_find_peer(&ctx, "/server2") == 0);
     
     PASS();
 }
@@ -82,31 +87,31 @@ static void test_fib_management(void) {
     // Add a peer
     struct sockaddr_in addr = make_addr("192.168.1.10", 9700);
     int peer_idx = mesh_add_peer(&ctx, "/server1", &addr);
-    assert(peer_idx == 0);
+    CHECK(peer_idx == 0);
     
     // Add FIB entries
     psirp_name prefix1 = make_name("/site/css");
     psirp_name prefix2 = make_name("/site/images");
     
-    assert(mesh_add_fib(&ctx, &prefix1, 0, 0));
-    assert(mesh_add_fib(&ctx, &prefix2, 0, 0));
-    assert(ctx.fib_count == 2);
+    CHECK(mesh_add_fib(&ctx, &prefix1, 0, 0));
+    CHECK(mesh_add_fib(&ctx, &prefix2, 0, 0));
+    CHECK(ctx.fib_count == 2);
     
     // Lookup
     psirp_name lookup1 = make_name("/site/css/style.css");
-    assert(mesh_fib_lookup(&ctx, &lookup1) == 0);
+    CHECK(mesh_fib_lookup(&ctx, &lookup1) == 0);
     
     psirp_name lookup2 = make_name("/site/images/logo.png");
-    assert(mesh_fib_lookup(&ctx, &lookup2) == 1);
+    CHECK(mesh_fib_lookup(&ctx, &lookup2) == 1);
     
     psirp_name lookup3 = make_name("/other/file.txt");
-    assert(mesh_fib_lookup(&ctx, &lookup3) == -1);
+    CHECK(mesh_fib_lookup(&ctx, &lookup3) == -1);
     
     // Remove FIB entry
     mesh_remove_fib(&ctx, 0);
-    assert(ctx.fib_count == 1);
-    assert(mesh_fib_lookup(&ctx, &lookup1) == -1);
-    assert(mesh_fib_lookup(&ctx, &lookup2) == 0);
+    CHECK(ctx.fib_count == 1);
+    CHECK(mesh_fib_lookup(&ctx, &lookup1) == -1);
+    CHECK(mesh_fib_lookup(&ctx, &lookup2) == 0);
     
     PASS();
 }
@@ -129,9 +134,9 @@ static void test_prefix_matching(void) {
     psirp_name test2 = make_name("/site/css/style.css");
     psirp_name test3 = make_name("/other/file.txt");
     
-    assert(mesh_fib_lookup(&ctx, &test1) == 0);
-    assert(mesh_fib_lookup(&ctx, &test2) == 0);
-    assert(mesh_fib_lookup(&ctx, &test3) == -1);
+    CHECK(mesh_fib_lookup(&ctx, &test1) == 0);
+    CHECK(mesh_fib_lookup(&ctx, &test2) == 0);
+    CHECK(mesh_fib_lookup(&ctx, &test3) == -1);
     
     PASS();
 }
@@ -144,23 +149,23 @@ static void test_beacon_format(void) {
     size_t len = strlen(beacon);
     
     // Verify header
-    assert(len > 12);
-    assert(memcmp(beacon, "MESH_BEACON|", 12) == 0);
+    CHECK(len > 12);
+    CHECK(memcmp(beacon, "MESH_BEACON|", 12) == 0);
     
     // Parse name
     const char *name_start = beacon + 12;
     const char *sep = strchr(name_start, '|');
-    assert(sep != NULL);
+    CHECK(sep != NULL);
     
     char name[256];
     size_t name_len = sep - name_start;
     memcpy(name, name_start, name_len);
     name[name_len] = '\0';
-    assert(strcmp(name, "server1") == 0);
+    CHECK(strcmp(name, "server1") == 0);
     
     // Parse prefixes
     const char *prefixes = sep + 1;
-    assert(strcmp(prefixes, "/site;/images") == 0);
+    CHECK(strcmp(prefixes, "/site;/images") == 0);
     
     PASS();
 }
@@ -179,8 +184,8 @@ static void test_peer_timeout(void) {
     
     // Check timeout at time 20000 (> 15000 timeout)
     size_t removed = mesh_check_timeouts(&ctx, 20000);
-    assert(removed == 1);
-    assert(ctx.peer_count == 0);
+    CHECK(removed == 1);
+    CHECK(ctx.peer_count == 0);
     
     PASS();
 }
@@ -203,11 +208,11 @@ static void test_stats(void) {
     uint64_t interests, data, multi_hop;
     mesh_stats(&ctx, &peers, &fib_entries, &interests, &data, &multi_hop);
     
-    assert(peers == 2);
-    assert(fib_entries == 0);
-    assert(interests == 100);
-    assert(data == 80);
-    assert(multi_hop == 50);
+    CHECK(peers == 2);
+    CHECK(fib_entries == 0);
+    CHECK(interests == 100);
+    CHECK(data == 80);
+    CHECK(multi_hop == 50);
     
     PASS();
 }
@@ -232,7 +237,7 @@ static void test_interest_dedup(void) {
             break;
         }
     }
-    assert(found);
+    CHECK(found);
     
     // Different nonce not found
     found = false;
@@ -242,7 +247,7 @@ static void test_interest_dedup(void) {
             break;
         }
     }
-    assert(!found);
+    CHECK(!found);
     
     PASS();
 }

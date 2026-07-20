@@ -96,6 +96,18 @@ else
 fi
 echo ""
 
+# Test 4c: Dynamic content (versioning, chunking, LRU, pub/sub, compute)
+echo "--- Test 4c: Dynamic Content ---"
+OUTPUT=$($BUILD_DIR/test_dynamic 2>&1)
+if echo "$OUTPUT" | grep -q "8 passed"; then
+    echo "[PASS] Dynamic content tests (8/8)"
+    PASS=$((PASS+1))
+else
+    echo "[FAIL] Dynamic content tests"
+    FAIL=$((FAIL+1))
+fi
+echo ""
+
 # Test 5: Signing
 echo "--- Test 5: Signing ---"
 OUTPUT=$($BUILD_DIR/test_signing 2>&1)
@@ -192,10 +204,10 @@ echo ""
 
 # Summary
 echo "=== Integration Test Results ==="
-echo "Passed: $PASS / 11"
-echo "Failed: $FAIL / 11"
+echo "Passed: $PASS / 12"
+echo "Failed: $FAIL / 12"
 echo ""
-echo "Unit tests: PSIRP(10) + HTML(9) + Mesh(7) + Signing(5) + DHT(10) = 41 total"
+echo "Unit tests: PSIRP(10) + HTML(9) + Mesh(7) + Signing(5) + DHT(10) + Dynamic(8) = 49 total"
 echo ""
 
 if [ $FAIL -eq 0 ]; then

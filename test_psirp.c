@@ -21,18 +21,23 @@ static int tests_passed = 0;
 #define PASS() do { tests_passed++; printf("[PASS]\n"); } while(0)
 #define FAIL(msg) do { printf("[FAIL] %s\n", msg); } while(0)
 
+/* CHECK always evaluates expr (unlike assert under -DNDEBUG) and fails gracefully. */
+#define CHECK(expr) do { \
+    if (!(expr)) { FAIL("check failed: " #expr); return; } \
+} while (0)
+
 // ── Name Tests ────────────────────────────────────────────────────────────────
 
 static void test_name_init(void) {
     TEST("name_init");
     psirp_name a, b;
-    assert(psirp_name_init(&a, "/test/page.html"));
-    assert(a.count == 2);
-    assert(strcmp(a.components[0], "test") == 0);
-    assert(strcmp(a.components[1], "page.html") == 0);
-    assert(a.hash != 0);
+    CHECK(psirp_name_init(&a, "/test/page.html"));
+    CHECK(a.count == 2);
+    CHECK(strcmp(a.components[0], "test") == 0);
+    CHECK(strcmp(a.components[1], "page.html") == 0);
+    CHECK(a.hash != 0);
     psirp_name_init(&b, "/test/page.html");
-    assert(a.hash == b.hash);
+    CHECK(a.hash == b.hash);
     PASS();
 }
 
@@ -42,8 +47,8 @@ static void test_name_equal(void) {
     psirp_name_init(&a, "/foo/bar");
     psirp_name_init(&b, "/foo/bar");
     psirp_name_init(&c, "/foo/baz");
-    assert(psirp_name_equal(&a, &b));
-    assert(!psirp_name_equal(&a, &c));
+    CHECK(psirp_name_equal(&a, &b));
+    CHECK(!psirp_name_equal(&a, &c));
     PASS();
 }
 
@@ -53,8 +58,8 @@ static void test_name_prefix(void) {
     psirp_name_init(&full, "/site/page/resource");
     psirp_name_init(&prefix, "/site/page");
     psirp_name_init(&other, "/other");
-    assert(psirp_name_is_prefix(&prefix, &full));
-    assert(!psirp_name_is_prefix(&other, &full));
+    CHECK(psirp_name_is_prefix(&prefix, &full));
+    CHECK(!psirp_name_is_prefix(&other, &full));
     PASS();
 }
 
@@ -64,8 +69,8 @@ static void test_name_to_string(void) {
     psirp_name_init(&name, "/hello/world");
     char buf[64];
     size_t len = psirp_name_to_string(&name, buf, sizeof(buf));
-    assert(len == 12);
-    assert(strcmp(buf, "/hello/world") == 0);
+    CHECK(len == 12);
+    CHECK(strcmp(buf, "/hello/world") == 0);
     PASS();
 }
 
@@ -78,13 +83,13 @@ static void test_interest_roundtrip(void) {
     psirp_interest orig = { .name = name, .nonce = 123456789ULL, .lifetime_ms = 4000 };
     uint8_t buf[4096];
     size_t len = psirp_interest_serialize(&orig, buf, sizeof(buf));
-    assert(len > 0);
+    CHECK(len > 0);
     psirp_interest decoded;
-    assert(psirp_interest_deserialize(&decoded, buf, len));
-    assert(decoded.nonce == 123456789ULL);
-    assert(decoded.lifetime_ms == 4000);
-    assert(decoded.name.count == 2);
-    assert(decoded.name.hash == name.hash);
+    CHECK(psirp_interest_deserialize(&decoded, buf, len));
+    CHECK(decoded.nonce == 123456789ULL);
+    CHECK(decoded.lifetime_ms == 4000);
+    CHECK(decoded.name.count == 2);
+    CHECK(decoded.name.hash == name.hash);
     PASS();
 }
 
@@ -99,12 +104,12 @@ static void test_data_roundtrip(void) {
     };
     uint8_t buf[4096];
     size_t len = psirp_data_serialize(&orig, buf, sizeof(buf));
-    assert(len > 0);
+    CHECK(len > 0);
     psirp_data decoded;
-    assert(psirp_data_deserialize(&decoded, buf, len));
-    assert(decoded.timestamp == 1000000000ULL);
-    assert(decoded.data_len == strlen(content));
-    assert(decoded.name.hash == name.hash);
+    CHECK(psirp_data_deserialize(&decoded, buf, len));
+    CHECK(decoded.timestamp == 1000000000ULL);
+    CHECK(decoded.data_len == strlen(content));
+    CHECK(decoded.name.hash == name.hash);
     PASS();
 }
 
@@ -118,11 +123,11 @@ static void test_cs_store_lookup(void) {
     psirp_name name;
     psirp_name_init(&name, "/test/content");
     const char *data = "hello world";
-    assert(psirp_cs_store(&cs, &name, (const uint8_t *)data, strlen(data), 0));
+    CHECK(psirp_cs_store(&cs, &name, (const uint8_t *)data, strlen(data), 0));
     const psirp_cs_entry *entry = psirp_cs_lookup(&cs, &name);
-    assert(entry != NULL);
-    assert(entry->data_len == strlen(data));
-    assert(memcmp(entry->data, data, strlen(data)) == 0);
+    CHECK(entry != NULL);
+    CHECK(entry->data_len == strlen(data));
+    CHECK(memcmp(entry->data, data, strlen(data)) == 0);
     PASS();
 }
 
@@ -133,19 +138,19 @@ static void test_cs_miss(void) {
     psirp_cs_init(&cs, arena, sizeof(arena));
     psirp_name name;
     psirp_name_init(&name, "/not/present");
-    assert(psirp_cs_lookup(&cs, &name) == NULL);
+    CHECK(psirp_cs_lookup(&cs, &name) == NULL);
     PASS();
 }
 
 static void test_fib(void) {
     TEST("fib_lookup");
     psirp_fib fib = {0};
-    assert(psirp_fib_add(&fib, "/site", inet_addr("10.0.0.1"), 9400));
+    CHECK(psirp_fib_add(&fib, "/site", inet_addr("10.0.0.1"), 9400));
     psirp_name name;
     psirp_name_init(&name, "/site/page");
     const psirp_peer *peer = psirp_fib_lookup(&fib, &name);
-    assert(peer != NULL);
-    assert(peer->ip == inet_addr("10.0.0.1"));
+    CHECK(peer != NULL);
+    CHECK(peer->ip == inet_addr("10.0.0.1"));
     PASS();
 }
 

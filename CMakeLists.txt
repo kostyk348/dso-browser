@@ -37,6 +37,8 @@ add_library(psirp STATIC
     mesh.c
     signing.c
     dht.c
+    pubsub.c
+    compute.c
 )
 
 target_include_directories(psirp PUBLIC
@@ -115,6 +117,9 @@ target_link_libraries(test_signing PRIVATE psirp Threads::Threads)
 
 add_executable(test_dht test_dht.c)
 target_link_libraries(test_dht PRIVATE psirp Threads::Threads)
+
+add_executable(test_dynamic test_dynamic.c)
+target_link_libraries(test_dynamic PRIVATE psirp Threads::Threads)
 
 add_executable(mesh_demo mesh_demo.c)
 target_link_libraries(mesh_demo PRIVATE psirp Threads::Threads)

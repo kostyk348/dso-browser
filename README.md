@@ -187,6 +187,27 @@ holder peers` and does **not** store content itself. Resolution:
 This removes the need for a static FIB: content is locatable by name alone,
 across an unstructured mesh.
 
+## Dynamic Content
+
+Static files are trivially cacheable, but real sites change (DB-backed
+pages, feeds, counters). PSIRP handles this with four mechanisms:
+
+- **Versioned names** — `/news@42` addresses a specific version; `/news`
+  (no `@version`) resolves to the *newest* stored version. Caching stays
+  correct because each version is content-addressable.
+- **Pub/Sub** (`pubsub.c`) — publishers announce new versions into the DHT;
+  subscribers watch a topic and pull `/topic@<newest>`. This is how a
+  "dynamic" site becomes a sequence of cacheable, signed snapshots.
+- **Chunking** (`psirp_cs_store_chunked`) — content > 64 KB is split into
+  64 KB chunks (each content-addressable, dedup by hash) plus a manifest.
+  Reassembly is transparent via `psirp_cs_lookup_chunked`.
+- **Compute-on-peer** (`compute.c`) — for truly live rendering, a request
+  carries parameters and an executor peer runs a registered handler (DSO
+  task graph) and returns a **signed** result. The requester verifies the
+  signature, not the transport.
+- **Smart cache** — the content store is size-limited and LRU-evicts by byte
+  budget (`psirp_cs_set_budget`), so large HTML/media don't blow up disk.
+
 ## Security
 
 Content is signed with **Ed25519** (`signing.c`, libsodium). Each published
