@@ -235,4 +235,4 @@ layer is in place; transport security is the next step.
 
 ## License
 
-MIT
+Apache 2.0
