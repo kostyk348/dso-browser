@@ -1,5 +1,9 @@
 # DSO-PSIRP Browser
 
+[![Release](https://img.shields.io/github/v/release/kostyk348/dso-browser?sort=semver&color=blue)](https://github.com/kostyk348/dso-browser/releases)
+[![License](https://img.shields.io/badge/license-Apache-2.0-green)](https://github.com/kostyk348/dso-browser/blob/main/LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/kostyk348/dso-browser?branch=main)](https://github.com/kostyk348/dso-browser/commits/main)
+
 Content-centric networking stack: **PSIRP + DSO deterministic task graphs + GTK4/WebKitGTK browser**
 
 Internet organized by **content name**, not IP address.
@@ -75,18 +79,22 @@ make -j$(nproc)
 ```bash
 ./dso-browser
 # Enter content name: /test/page.html
+
 ```
 
 ### Run Mesh Demo (3 peers)
 
 ```bash
 # Terminal 1
+
 ./mesh_demo /games 9700 ./content/games
 
 # Terminal 2
+
 ./mesh_demo /music 9701 ./content/music
 
 # Terminal 3
+
 ./mesh_demo /docs  9702 ./content/docs
 ```
 
