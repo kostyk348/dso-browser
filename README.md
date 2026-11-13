@@ -1,10 +1,19 @@
+<div align="center">
+
+<img src="docs/banner.svg" alt="dso-browser banner" width="1000">
+
 # DSO-PSIRP Browser
+
+### Content-centric networking stack: PSIRP + DSO deterministic task graphs + GTK4/WebKitGTK browser
 
 [![Release](https://img.shields.io/github/v/release/kostyk348/dso-browser?sort=semver&color=blue)](https://github.com/kostyk348/dso-browser/releases)
 [![License](https://img.shields.io/badge/license-Apache-2.0-green)](https://github.com/kostyk348/dso-browser/blob/main/LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/kostyk348/dso-browser?branch=main)](https://github.com/kostyk348/dso-browser/commits/main)
 
-Content-centric networking stack: **PSIRP + DSO deterministic task graphs + GTK4/WebKitGTK browser**
+</div>
+
+---
+
 
 Internet organized by **content name**, not IP address.
 
